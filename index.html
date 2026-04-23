@@ -283,13 +283,15 @@ body {
 <div id="login-screen">
   <div id="login-card">
     <h2>记忆承载</h2>
-    <p class="subtitle">输入 GitHub Personal Access Token 开始阅读</p>
-    <label class="form-label" for="token-input">Personal Access Token</label>
+    <p class="subtitle">添加第一个仓库以开始阅读</p>
+    <label class="form-label" for="login-repo-input">仓库地址</label>
+    <input type="text" id="login-repo-input" class="form-input" placeholder="owner/repo-name" autocomplete="off" spellcheck="false" value="jiu-33/SecretGarden">
+    <label class="form-label" style="margin-top:14px" for="token-input">Personal Access Token</label>
     <input type="password" id="token-input" class="form-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
-    <p class="form-hint">需要 <strong>repo</strong> 权限（读取私有仓库）。Token 仅保存在本设备浏览器中。</p>
-    <button class="btn-primary" id="login-btn" onclick="doLogin()">进入</button>
+    <p class="form-hint">需要 <strong>repo</strong> 权限。Token 与仓库绑定，仅保存在本设备浏览器中。</p>
+    <button class="btn-primary" id="login-btn" onclick="doLogin()">验证并进入</button>
     <p id="login-error"></p>
-    <div id="login-footer">Token 存于 localStorage，关闭浏览器后仍有效<br>如需退出，点击应用内「退出登录」</div>
+    <div id="login-footer">每个仓库可绑定独立的 Token，切换仓库时自动切换</div>
   </div>
 </div>
 
@@ -345,7 +347,9 @@ body {
     <h3>添加仓库</h3>
     <label class="form-label" for="new-repo-input">仓库地址</label>
     <input type="text" id="new-repo-input" class="form-input" placeholder="owner/repo-name" autocomplete="off" spellcheck="false">
-    <p class="form-hint">填写 GitHub 仓库的 owner/repo 格式，例如：<br><code>jiu-33/SecretGarden</code></p>
+    <label class="form-label" style="margin-top:12px" for="new-token-input">Personal Access Token</label>
+    <input type="password" id="new-token-input" class="form-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+    <p class="form-hint" style="margin-top:8px">每个仓库绑定独立的 Token</p>
     <p id="modal-error"></p>
     <div class="modal-btns">
       <button class="btn-secondary" onclick="closeModal()">取消</button>
@@ -355,10 +359,9 @@ body {
 </div>
 
 <script>
-const DEFAULT_REPO = 'jiu-33/SecretGarden';
 const API_BASE = 'https://api.github.com/repos/';
 
-let TOKEN = '';
+let TOKEN = '';       // 当前仓库的 token
 let currentRepo = '';
 let currentYear = 'all';
 let allArticles = [];
@@ -370,82 +373,74 @@ const LS = {
   remove: k => localStorage.removeItem(k),
 };
 
-function getRepos() {
-  const repos = LS.get('jm_repos') || [DEFAULT_REPO];
-  if (!repos.includes(DEFAULT_REPO)) repos.unshift(DEFAULT_REPO);
-  return repos;
+// 存储格式：[{repo: 'owner/name', token: 'ghp_xxx'}, ...]
+function getRepoList() { return LS.get('jm_repos_v2') || []; }
+function saveRepoList(list) { LS.set('jm_repos_v2', list); }
+function getTokenForRepo(repo) {
+  const entry = getRepoList().find(r => r.repo === repo);
+  return entry ? entry.token : '';
 }
-function saveRepos(repos) { LS.set('jm_repos', repos); }
 
-// ========== 登录 ==========
+// ========== 登录（首次添加仓库） ==========
 function doLogin() {
-  const input = document.getElementById('token-input').value.trim();
-  if (!input) { document.getElementById('login-error').textContent = '请输入 Token'; return; }
+  const repo  = document.getElementById('login-repo-input').value.trim();
+  const token = document.getElementById('token-input').value.trim();
+  if (!repo || !repo.includes('/')) { showLoginError('仓库格式错误，请填写 owner/repo'); return; }
+  if (!token) { showLoginError('请输入 Token'); return; }
   const btn = document.getElementById('login-btn');
   btn.textContent = '验证中…'; btn.disabled = true;
   document.getElementById('login-error').textContent = '';
 
-  fetch(API_BASE + DEFAULT_REPO, { headers: { Authorization: 'token ' + input } })
+  fetch(API_BASE + repo, { headers: { Authorization: 'token ' + token } })
     .then(r => {
-      if (r.ok) {
-        LS.set('jm_token', input);
-        TOKEN = input;
+      if (r.ok || r.status === 404) {
+        // 404 = 私有仓库 token 有效但可能权限不足，仍允许保存
+        const list = getRepoList().filter(e => e.repo !== repo);
+        list.unshift({ repo, token });
+        saveRepoList(list);
+        TOKEN = token;
         launchApp();
       } else if (r.status === 401 || r.status === 403) {
         showLoginError('Token 无效或权限不足');
-      } else if (r.status === 404) {
-        // token 有效但默认仓库不存在，仍然允许进入
-        LS.set('jm_token', input);
-        TOKEN = input;
-        launchApp();
+        btn.textContent = '验证并进入'; btn.disabled = false;
       } else {
         showLoginError('验证失败（HTTP ' + r.status + '）');
+        btn.textContent = '验证并进入'; btn.disabled = false;
       }
     })
-    .catch(() => showLoginError('网络错误，请检查网络后重试'));
+    .catch(() => {
+      showLoginError('网络错误，请检查网络后重试');
+      btn.textContent = '验证并进入'; btn.disabled = false;
+    });
 }
 
 function showLoginError(msg) {
   document.getElementById('login-error').textContent = msg;
-  const btn = document.getElementById('login-btn');
-  btn.textContent = '进入'; btn.disabled = false;
-}
-
-function doLogout() {
-  if (!confirm('确认退出登录？')) return;
-  LS.remove('jm_token');
-  TOKEN = '';
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('token-input').value = '';
-  document.getElementById('login-btn').textContent = '进入';
-  document.getElementById('login-btn').disabled = false;
-  document.getElementById('login-error').textContent = '';
 }
 
 document.getElementById('token-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('login-repo-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 function launchApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   buildRepoSelector();
-  const repos = getRepos();
-  switchRepo(repos[0]);
+  const list = getRepoList();
+  if (list.length > 0) switchRepo(list[0].repo);
 }
 
 // ========== 仓库管理 ==========
 function buildRepoSelector() {
   const sel = document.getElementById('repo-select');
-  const repos = getRepos();
-  sel.innerHTML = repos.map(r => `<option value="${r}">${r}</option>`).join('');
+  const list = getRepoList();
+  sel.innerHTML = list.map(e => `<option value="${escAttr(e.repo)}">${escHtml(e.repo)}</option>`).join('');
   if (currentRepo) sel.value = currentRepo;
 }
 
 function switchRepo(repo) {
   currentRepo = repo;
+  TOKEN = getTokenForRepo(repo);
   document.getElementById('repo-select').value = repo;
-  // 不允许删除唯一仓库
-  document.getElementById('remove-repo-btn').disabled = getRepos().length <= 1;
   allArticles = [];
   currentYear = 'all';
   clearReader();
@@ -454,6 +449,7 @@ function switchRepo(repo) {
 
 function openAddRepo() {
   document.getElementById('new-repo-input').value = '';
+  document.getElementById('new-token-input').value = '';
   document.getElementById('modal-error').textContent = '';
   document.getElementById('modal-overlay').classList.add('open');
   setTimeout(() => document.getElementById('new-repo-input').focus(), 100);
@@ -462,30 +458,36 @@ function openAddRepo() {
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
 function closeModalIfOutside(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
 
-document.getElementById('new-repo-input').addEventListener('keydown', e => { if (e.key === 'Enter') confirmAddRepo(); });
+document.getElementById('new-repo-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('new-token-input').focus(); });
+document.getElementById('new-token-input').addEventListener('keydown', e => { if (e.key === 'Enter') confirmAddRepo(); });
 
 function confirmAddRepo() {
-  const val = document.getElementById('new-repo-input').value.trim();
-  if (!val || !val.includes('/')) {
+  const repo  = document.getElementById('new-repo-input').value.trim();
+  const token = document.getElementById('new-token-input').value.trim();
+  if (!repo || !repo.includes('/')) {
     document.getElementById('modal-error').textContent = '格式错误，请填写 owner/repo';
+    return;
+  }
+  if (!token) {
+    document.getElementById('modal-error').textContent = '请输入该仓库的 Token';
     return;
   }
   const btn = document.querySelector('.btn-modal-ok');
   btn.textContent = '验证中…'; btn.disabled = true;
   document.getElementById('modal-error').textContent = '';
 
-  fetch(API_BASE + val, { headers: { Authorization: 'token ' + TOKEN } })
+  fetch(API_BASE + repo, { headers: { Authorization: 'token ' + token } })
     .then(r => {
       btn.textContent = '验证并添加'; btn.disabled = false;
       if (r.ok || r.status === 404) {
-        // 404 可能是私有仓库但 token 权限不足，仍允许添加
-        const repos = getRepos();
-        if (!repos.includes(val)) { repos.push(val); saveRepos(repos); }
+        const list = getRepoList().filter(e => e.repo !== repo);
+        list.push({ repo, token });
+        saveRepoList(list);
         buildRepoSelector();
         closeModal();
-        switchRepo(val);
+        switchRepo(repo);
       } else if (r.status === 401 || r.status === 403) {
-        document.getElementById('modal-error').textContent = 'Token 无权访问此仓库';
+        document.getElementById('modal-error').textContent = 'Token 无效或无权访问此仓库';
       } else {
         document.getElementById('modal-error').textContent = '验证失败（HTTP ' + r.status + '）';
       }
@@ -494,17 +496,6 @@ function confirmAddRepo() {
       btn.textContent = '验证并添加'; btn.disabled = false;
       document.getElementById('modal-error').textContent = '网络错误';
     });
-}
-
-function removeCurrentRepo() {
-  const repos = getRepos();
-  if (repos.length <= 1) return;
-  if (!confirm(`删除仓库 "${currentRepo}"？`)) return;
-  const idx = repos.indexOf(currentRepo);
-  repos.splice(idx, 1);
-  saveRepos(repos);
-  buildRepoSelector();
-  switchRepo(repos[Math.min(idx, repos.length - 1)]);
 }
 
 // ========== 动态加载文章列表 ==========
@@ -700,11 +691,15 @@ function showTab(tab) {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function escAttr(s) { return String(s).replace(/"/g,'&quot;'); }
 
 // ========== 初始化 ==========
 window.onload = function() {
-  const stored = LS.get('jm_token');
-  if (stored) { TOKEN = stored; launchApp(); }
+  const list = getRepoList();
+  if (list.length > 0) {
+    TOKEN = list[0].token;
+    launchApp();
+  }
   // 移动端默认显示目录
   if (window.innerWidth <= 768) showTab('list');
 };
