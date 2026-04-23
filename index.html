@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>记忆承载</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+:root {
+  --bg: #faf9f6;
+  --sidebar-bg: #ffffff;
+  --border: #ece8e0;
+  --accent: #8b6f47;
+  --accent-light: #f0e8da;
+  --text: #2a2a2a;
+  --text-muted: #999;
+  --text-secondary: #666;
+  --item-hover: #f7f4ef;
+  --item-active: #ede5d8;
+  --tab-bg: #ffffff;
+  --tab-border: #e8e4dc;
+  --danger: #e05c5c;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ========== 通用组件 ========== */
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ========== 登录界面 ========== */
+#login-screen {
+  position: fixed; inset: 0; z-index: 1000;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+#login-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 32px;
+  width: 100%; max-width: 420px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+#login-card h2 { font-size: 22px; font-weight: 700; letter-spacing: 3px; margin-bottom: 6px; }
+#login-card .subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; line-height: 1.6; }
+.form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+.form-input {
+  width: 100%; padding: 11px 13px;
+  border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: 14px; color: var(--text); background: var(--bg);
+  outline: none; transition: border-color 0.2s;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-input::placeholder { color: var(--text-muted); }
+#token-input { font-family: "SF Mono", "Fira Code", monospace; letter-spacing: 0.5px; }
+.form-hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
+.btn-primary {
+  width: 100%; padding: 13px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 9px;
+  font-size: 15px; font-weight: 600; letter-spacing: 1px;
+  cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+  margin-top: 20px;
+}
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+#login-error { margin-top: 10px; font-size: 13px; color: var(--danger); text-align: center; min-height: 18px; }
+#login-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); text-align: center; line-height: 1.8; }
+
+/* ========== 主应用 ========== */
+#app { display: flex; height: 100vh; overflow: hidden; }
+
+/* 侧边栏 */
+#sidebar {
+  width: 290px; flex-shrink: 0;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* 侧边栏顶部 */
+#sidebar-top {
+  padding: 16px 14px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#sidebar-top h1 { font-size: 16px; font-weight: 700; letter-spacing: 3px; margin-bottom: 10px; }
+
+/* 仓库选择器 */
+#repo-selector-wrap { position: relative; }
+#repo-select {
+  width: 100%; padding: 8px 30px 8px 10px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 13px; color: var(--text); background: var(--bg);
+  outline: none; cursor: pointer; appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.2s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#repo-select:focus { border-color: var(--accent); }
+#repo-selector-wrap::after {
+  content: '▾'; position: absolute; right: 10px; top: 50%;
+  transform: translateY(-50%); pointer-events: none;
+  color: var(--text-muted); font-size: 12px;
+}
+#repo-actions { display: flex; gap: 6px; margin-top: 7px; }
+.repo-btn {
+  flex: 1; padding: 5px 8px;
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 11px; color: var(--text-secondary);
+  background: none; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.repo-btn:hover { background: var(--item-hover); }
+.repo-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+#logout-btn { font-size: 11px; color: var(--text-muted); }
+#logout-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+/* 年份 tabs */
+#year-tabs {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.year-tab {
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent; border: 1px solid transparent;
+  cursor: pointer; transition: all 0.15s;
+}
+.year-tab:hover { background: var(--item-hover); }
+.year-tab.active { background: var(--accent-light); color: var(--accent); border-color: #d9c5a8; font-weight: 600; }
+
+/* 文章列表 */
+#article-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+#article-list::-webkit-scrollbar { width: 4px; }
+#article-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+
+.article-item {
+  padding: 10px 14px; cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+}
+.article-item:hover { background: var(--item-hover); }
+.article-item.active { background: var(--item-active); border-left-color: var(--accent); }
+.article-item .title {
+  font-size: 13px; font-weight: 500; color: var(--text);
+  line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.article-item .date { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.article-item.active .title { color: var(--accent); }
+
+/* 列表状态 */
+.list-status {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 40px 20px; gap: 12px; color: var(--text-muted);
+}
+.list-status p { font-size: 13px; text-align: center; line-height: 1.7; }
+
+/* 主阅读区 */
+#main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+#main-header {
+  padding: 18px 32px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; background: var(--bg);
+  display: none;
+}
+#main-header h2 { font-size: 18px; font-weight: 700; line-height: 1.4; }
+#main-header .date-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+#placeholder {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text-muted); gap: 10px; padding: 40px;
+}
+#placeholder .icon { font-size: 44px; opacity: 0.25; }
+#placeholder p { font-size: 14px; text-align: center; line-height: 1.8; }
+#md-body {
+  flex: 1; overflow-y: auto;
+  padding: 28px 32px 48px;
+  max-width: 780px; width: 100%;
+  display: none;
+}
+#md-body::-webkit-scrollbar { width: 5px; }
+#md-body::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+#md-body h1, #md-body h2, #md-body h3 { color: var(--text); font-weight: 700; margin: 1.6em 0 0.6em; line-height: 1.4; }
+#md-body h1 { font-size: 20px; } #md-body h2 { font-size: 17px; } #md-body h3 { font-size: 15px; }
+#md-body p { font-size: 15px; line-height: 1.95; color: var(--text); margin: 0.8em 0; }
+#md-body a { color: var(--accent); text-decoration: none; }
+#md-body a:hover { text-decoration: underline; }
+#md-body blockquote { border-left: 3px solid var(--accent-light); padding: 8px 16px; margin: 1em 0; color: var(--text-secondary); background: var(--item-hover); border-radius: 0 6px 6px 0; }
+#md-body hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
+#md-body strong { font-weight: 700; }
+
+/* ========== 弹窗：添加仓库 ========== */
+#modal-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.35);
+  display: none; align-items: center; justify-content: center;
+  padding: 24px;
+}
+#modal-overlay.open { display: flex; }
+#modal-card {
+  background: #fff; border-radius: 14px;
+  padding: 28px 24px; width: 100%; max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+#modal-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+#modal-card .form-hint { margin-bottom: 16px; }
+.modal-btns { display: flex; gap: 10px; margin-top: 18px; }
+.btn-secondary {
+  flex: 1; padding: 10px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 14px; font-weight: 500; color: var(--text-secondary);
+  background: none; cursor: pointer; transition: all 0.15s;
+}
+.btn-secondary:hover { background: var(--item-hover); }
+.btn-modal-ok {
+  flex: 2; padding: 10px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: opacity 0.2s;
+}
+.btn-modal-ok:hover { opacity: 0.9; }
+#modal-error { font-size: 12px; color: var(--danger); margin-top: 8px; min-height: 16px; }
+
+/* ========== 移动端 ========== */
+@media (max-width: 768px) {
+  #sidebar {
+    position: fixed; inset: 0; width: 100%; z-index: 100;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+    padding-bottom: 60px;
+  }
+  #sidebar.visible { transform: translateX(0); }
+  #main { padding-bottom: 56px; }
+  #main-header { padding: 14px 16px 10px; }
+  #main-header h2 { font-size: 16px; }
+  #md-body { padding: 20px 16px 40px; }
+  #md-body p { font-size: 14.5px; }
+  #tab-bar { display: flex !important; }
+}
+#tab-bar {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 56px; z-index: 200;
+  background: var(--tab-bg);
+  border-top: 1px solid var(--tab-border);
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+}
+.tab-btn {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 11px; font-weight: 500;
+  transition: color 0.15s;
+}
+.tab-btn svg { width: 22px; height: 22px; }
+.tab-btn.active { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- 登录界面 -->
+<div id="login-screen">
+  <div id="login-card">
+    <h2>记忆承载</h2>
+    <p class="subtitle">输入 GitHub Personal Access Token 开始阅读</p>
+    <label class="form-label" for="token-input">Personal Access Token</label>
+    <input type="password" id="token-input" class="form-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+    <p class="form-hint">需要 <strong>repo</strong> 权限（读取私有仓库）。Token 仅保存在本设备浏览器中。</p>
+    <button class="btn-primary" id="login-btn" onclick="doLogin()">进入</button>
+    <p id="login-error"></p>
+    <div id="login-footer">Token 存于 localStorage，关闭浏览器后仍有效<br>如需退出，点击应用内「退出登录」</div>
+  </div>
+</div>
+
+<!-- 主应用 -->
+<div id="app" style="display:none">
+  <div id="sidebar">
+    <div id="sidebar-top">
+      <h1>记忆承载</h1>
+      <div id="repo-selector-wrap">
+        <select id="repo-select" onchange="switchRepo(this.value)"></select>
+      </div>
+      <div id="repo-actions">
+        <button class="repo-btn" onclick="openAddRepo()">＋ 添加仓库</button>
+        <button class="repo-btn danger" id="remove-repo-btn" onclick="removeCurrentRepo()">删除当前</button>
+        <button class="repo-btn" id="logout-btn" onclick="doLogout()">退出登录</button>
+      </div>
+    </div>
+    <div id="year-tabs"></div>
+    <div id="article-list"></div>
+  </div>
+
+  <div id="main">
+    <div id="main-header">
+      <h2 id="article-title"></h2>
+      <div class="date-label" id="article-date"></div>
+    </div>
+    <div id="placeholder">
+      <div class="icon">📖</div>
+      <p id="placeholder-text">从左侧目录选择一篇文章开始阅读</p>
+    </div>
+    <div id="md-body"></div>
+  </div>
+</div>
+
+<!-- 底部 Tab 栏（移动端） -->
+<div id="tab-bar">
+  <button class="tab-btn active" id="tab-list" onclick="showTab('list')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/>
+    </svg>
+    目录
+  </button>
+  <button class="tab-btn" id="tab-read" onclick="showTab('read')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+    </svg>
+    阅读
+  </button>
+</div>
+
+<!-- 添加仓库弹窗 -->
+<div id="modal-overlay" onclick="closeModalIfOutside(event)">
+  <div id="modal-card">
+    <h3>添加仓库</h3>
+    <label class="form-label" for="new-repo-input">仓库地址</label>
+    <input type="text" id="new-repo-input" class="form-input" placeholder="owner/repo-name" autocomplete="off" spellcheck="false">
+    <p class="form-hint">填写 GitHub 仓库的 owner/repo 格式，例如：<br><code>jiu-33/SecretGarden</code></p>
+    <p id="modal-error"></p>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn-modal-ok" onclick="confirmAddRepo()">验证并添加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_REPO = 'jiu-33/SecretGarden';
+const API_BASE = 'https://api.github.com/repos/';
+
+let TOKEN = '';
+let currentRepo = '';
+let currentYear = 'all';
+let allArticles = [];
+
+// ========== localStorage 工具 ==========
+const LS = {
+  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+  remove: k => localStorage.removeItem(k),
+};
+
+function getRepos() {
+  const repos = LS.get('jm_repos') || [DEFAULT_REPO];
+  if (!repos.includes(DEFAULT_REPO)) repos.unshift(DEFAULT_REPO);
+  return repos;
+}
+function saveRepos(repos) { LS.set('jm_repos', repos); }
+
+// ========== 登录 ==========
+function doLogin() {
+  const input = document.getElementById('token-input').value.trim();
+  if (!input) { document.getElementById('login-error').textContent = '请输入 Token'; return; }
+  const btn = document.getElementById('login-btn');
+  btn.textContent = '验证中…'; btn.disabled = true;
+  document.getElementById('login-error').textContent = '';
+
+  fetch(API_BASE + DEFAULT_REPO, { headers: { Authorization: 'token ' + input } })
+    .then(r => {
+      if (r.ok) {
+        LS.set('jm_token', input);
+        TOKEN = input;
+        launchApp();
+      } else if (r.status === 401 || r.status === 403) {
+        showLoginError('Token 无效或权限不足');
+      } else if (r.status === 404) {
+        // token 有效但默认仓库不存在，仍然允许进入
+        LS.set('jm_token', input);
+        TOKEN = input;
+        launchApp();
+      } else {
+        showLoginError('验证失败（HTTP ' + r.status + '）');
+      }
+    })
+    .catch(() => showLoginError('网络错误，请检查网络后重试'));
+}
+
+function showLoginError(msg) {
+  document.getElementById('login-error').textContent = msg;
+  const btn = document.getElementById('login-btn');
+  btn.textContent = '进入'; btn.disabled = false;
+}
+
+function doLogout() {
+  if (!confirm('确认退出登录？')) return;
+  LS.remove('jm_token');
+  TOKEN = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('token-input').value = '';
+  document.getElementById('login-btn').textContent = '进入';
+  document.getElementById('login-btn').disabled = false;
+  document.getElementById('login-error').textContent = '';
+}
+
+document.getElementById('token-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+function launchApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  buildRepoSelector();
+  const repos = getRepos();
+  switchRepo(repos[0]);
+}
+
+// ========== 仓库管理 ==========
+function buildRepoSelector() {
+  const sel = document.getElementById('repo-select');
+  const repos = getRepos();
+  sel.innerHTML = repos.map(r => `<option value="${r}">${r}</option>`).join('');
+  if (currentRepo) sel.value = currentRepo;
+}
+
+function switchRepo(repo) {
+  currentRepo = repo;
+  document.getElementById('repo-select').value = repo;
+  // 不允许删除唯一仓库
+  document.getElementById('remove-repo-btn').disabled = getRepos().length <= 1;
+  allArticles = [];
+  currentYear = 'all';
+  clearReader();
+  loadRepoArticles(repo);
+}
+
+function openAddRepo() {
+  document.getElementById('new-repo-input').value = '';
+  document.getElementById('modal-error').textContent = '';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('new-repo-input').focus(), 100);
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+function closeModalIfOutside(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
+
+document.getElementById('new-repo-input').addEventListener('keydown', e => { if (e.key === 'Enter') confirmAddRepo(); });
+
+function confirmAddRepo() {
+  const val = document.getElementById('new-repo-input').value.trim();
+  if (!val || !val.includes('/')) {
+    document.getElementById('modal-error').textContent = '格式错误，请填写 owner/repo';
+    return;
+  }
+  const btn = document.querySelector('.btn-modal-ok');
+  btn.textContent = '验证中…'; btn.disabled = true;
+  document.getElementById('modal-error').textContent = '';
+
+  fetch(API_BASE + val, { headers: { Authorization: 'token ' + TOKEN } })
+    .then(r => {
+      btn.textContent = '验证并添加'; btn.disabled = false;
+      if (r.ok || r.status === 404) {
+        // 404 可能是私有仓库但 token 权限不足，仍允许添加
+        const repos = getRepos();
+        if (!repos.includes(val)) { repos.push(val); saveRepos(repos); }
+        buildRepoSelector();
+        closeModal();
+        switchRepo(val);
+      } else if (r.status === 401 || r.status === 403) {
+        document.getElementById('modal-error').textContent = 'Token 无权访问此仓库';
+      } else {
+        document.getElementById('modal-error').textContent = '验证失败（HTTP ' + r.status + '）';
+      }
+    })
+    .catch(() => {
+      btn.textContent = '验证并添加'; btn.disabled = false;
+      document.getElementById('modal-error').textContent = '网络错误';
+    });
+}
+
+function removeCurrentRepo() {
+  const repos = getRepos();
+  if (repos.length <= 1) return;
+  if (!confirm(`删除仓库 "${currentRepo}"？`)) return;
+  const idx = repos.indexOf(currentRepo);
+  repos.splice(idx, 1);
+  saveRepos(repos);
+  buildRepoSelector();
+  switchRepo(repos[Math.min(idx, repos.length - 1)]);
+}
+
+// ========== 动态加载文章列表 ==========
+async function loadRepoArticles(repo) {
+  setListStatus('<div class="spinner"></div><p>正在读取目录…</p>');
+  document.getElementById('year-tabs').innerHTML = '';
+
+  try {
+    // 先获取仓库根目录
+    const rootResp = await fetch(API_BASE + repo + '/contents/', {
+      headers: { Authorization: 'token ' + TOKEN }
+    });
+    if (!rootResp.ok) throw new Error('HTTP ' + rootResp.status);
+    const rootItems = await rootResp.json();
+
+    // 找出所有目录（年份目录 + 其他目录）
+    const dirs = rootItems.filter(i => i.type === 'dir');
+
+    if (dirs.length === 0) {
+      // 根目录直接有 .md 文件
+      const mdFiles = rootItems.filter(i => i.type === 'file' && i.name.endsWith('.md'));
+      allArticles = mdFiles.map(f => parseArticle(f.name, f.path, ''));
+      renderArticleList();
+      return;
+    }
+
+    // 并发获取各目录内容
+    const dirContents = await Promise.all(
+      dirs.map(d =>
+        fetch(API_BASE + repo + '/contents/' + encodeURIComponent(d.name), {
+          headers: { Authorization: 'token ' + TOKEN }
+        }).then(r => r.ok ? r.json() : []).catch(() => [])
+      )
+    );
+
+    allArticles = [];
+    dirs.forEach((dir, i) => {
+      const files = Array.isArray(dirContents[i]) ? dirContents[i] : [];
+      files.filter(f => f.type === 'file' && f.name.endsWith('.md')).forEach(f => {
+        allArticles.push(parseArticle(f.name, f.path, dir.name));
+      });
+    });
+
+    allArticles.sort((a, b) => b.date.localeCompare(a.date));
+    renderArticleList();
+
+  } catch (e) {
+    let msg = e.message;
+    if (msg.includes('401') || msg.includes('403')) msg = 'Token 无权访问此仓库';
+    else if (msg.includes('404')) msg = '仓库不存在或无法访问';
+    setListStatus(`<p>加载失败：${msg}</p>`);
+  }
+}
+
+function parseArticle(filename, apiPath, dirName) {
+  // 尝试从文件名解析日期和标题，格式：YYYY-MM-DD_标题.md
+  const m = filename.match(/^(\d{4}-\d{2}-\d{2})_(.+)\.md$/);
+  if (m) {
+    return { date: m[1], year: m[1].slice(0, 4), title: m[2], path: apiPath };
+  }
+  // 无日期格式
+  const title = filename.replace(/\.md$/, '');
+  const year = dirName.match(/^\d{4}$/) ? dirName : '其他';
+  return { date: '', year, title, path: apiPath };
+}
+
+// ========== 渲染列表 ==========
+function renderArticleList() {
+  if (allArticles.length === 0) {
+    setListStatus('<p>此仓库中未找到 .md 文件</p>');
+    return;
+  }
+
+  // 构建年份 tabs
+  const years = [...new Set(allArticles.map(a => a.year))].sort((a, b) => b.localeCompare(a));
+  const tabsEl = document.getElementById('year-tabs');
+  tabsEl.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'year-tab' + (currentYear === 'all' ? ' active' : '');
+  allBtn.textContent = '全部';
+  allBtn.onclick = () => filterYear('all');
+  tabsEl.appendChild(allBtn);
+  years.forEach(y => {
+    const btn = document.createElement('button');
+    btn.className = 'year-tab' + (currentYear === y ? ' active' : '');
+    btn.textContent = y;
+    btn.onclick = () => filterYear(y);
+    tabsEl.appendChild(btn);
+  });
+
+  renderFilteredList();
+}
+
+function filterYear(year) {
+  currentYear = year;
+  document.querySelectorAll('.year-tab').forEach(b => {
+    b.classList.toggle('active',
+      (year === 'all' && b.textContent === '全部') || b.textContent === year
+    );
+  });
+  renderFilteredList();
+}
+
+function renderFilteredList() {
+  const list = document.getElementById('article-list');
+  list.innerHTML = '';
+  const filtered = currentYear === 'all' ? allArticles : allArticles.filter(a => a.year === currentYear);
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="list-status"><p>暂无文章</p></div>';
+    return;
+  }
+  filtered.forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'article-item';
+    div.dataset.path = a.path;
+    div.innerHTML = `<div class="title">${escHtml(a.title)}</div>${a.date ? `<div class="date">${a.date}</div>` : ''}`;
+    div.onclick = () => loadArticle(a, div);
+    list.appendChild(div);
+  });
+}
+
+function setListStatus(html) {
+  document.getElementById('year-tabs').innerHTML = '';
+  document.getElementById('article-list').innerHTML = `<div class="list-status">${html}</div>`;
+}
+
+// ========== 读取文章 ==========
+async function loadArticle(article, el) {
+  document.querySelectorAll('.article-item').forEach(d => d.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  document.getElementById('article-title').textContent = article.title;
+  document.getElementById('article-date').textContent = article.date;
+  document.getElementById('main-header').style.display = '';
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('md-body').style.display = 'block';
+  document.getElementById('md-body').innerHTML = '<div style="display:flex;justify-content:center;padding:60px 0"><div class="spinner"></div></div>';
+
+  showTab('read');
+
+  try {
+    const encodedPath = article.path.split('/').map(encodeURIComponent).join('/');
+    const resp = await fetch(API_BASE + currentRepo + '/contents/' + encodedPath, {
+      headers: { Authorization: 'token ' + TOKEN }
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const json = await resp.json();
+    const text = decodeURIComponent(escape(atob(json.content.replace(/\n/g, ''))));
+    document.getElementById('md-body').innerHTML = marked.parse(text);
+    document.getElementById('md-body').scrollTop = 0;
+  } catch (e) {
+    document.getElementById('md-body').innerHTML =
+      `<div style="padding:40px;text-align:center;color:var(--danger)">
+        <p>加载失败：${escHtml(e.message)}</p>
+        <p style="font-size:12px;margin-top:8px;color:var(--text-muted)">请检查网络或 Token 权限</p>
+      </div>`;
+  }
+}
+
+function clearReader() {
+  document.getElementById('main-header').style.display = 'none';
+  document.getElementById('placeholder').style.display = 'flex';
+  document.getElementById('placeholder-text').textContent = '从左侧目录选择一篇文章开始阅读';
+  document.getElementById('md-body').style.display = 'none';
+  document.getElementById('md-body').innerHTML = '';
+}
+
+// ========== Tab 切换（移动端） ==========
+function showTab(tab) {
+  const sidebar = document.getElementById('sidebar');
+  document.getElementById('tab-list').classList.toggle('active', tab === 'list');
+  document.getElementById('tab-read').classList.toggle('active', tab === 'read');
+  sidebar.classList.toggle('visible', tab === 'list');
+}
+
+// ========== 工具 ==========
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ========== 初始化 ==========
+window.onload = function() {
+  const stored = LS.get('jm_token');
+  if (stored) { TOKEN = stored; launchApp(); }
+};
+</script>
+</body>
+</html>
