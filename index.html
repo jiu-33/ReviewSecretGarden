@@ -548,7 +548,7 @@ async function scanDir(repo, path, articles, depth) {
   const items = await fetchDir(repo, path);
   if (!Array.isArray(items)) return;
 
-  const mdFiles = items.filter(i => i.type === 'file' && i.name.endsWith('.md'));
+  const mdFiles = items.filter(i => i.type === 'file' && /\.(md|pdf)$/i.test(i.name));
   const dirs = items.filter(i => i.type === 'dir');
 
   // 收集当前目录下的 .md 文件
@@ -560,15 +560,19 @@ async function scanDir(repo, path, articles, depth) {
 }
 
 function parseArticle(filename, apiPath, dirName) {
-  // 尝试从文件名解析日期和标题，格式：YYYY-MM-DD_标题.md
-  const m = filename.match(/^(\d{4}-\d{2}-\d{2})_(.+)\.md$/);
+  const isPdf = filename.toLowerCase().endsWith('.pdf');
+  const ext = isPdf ? /\.pdf$/i : /\.md$/i;
+  // 尝试从文件名解析日期和标题，格式：YYYY-MM-DD_标题.ext 或 YYYY-M-D_标题.ext
+  const m = filename.match(/^(\d{4}-\d{1,2}-\d{1,2})_(.+)\.(md|pdf)$/i);
   if (m) {
-    return { date: m[1], year: m[1].slice(0, 4), title: m[2], path: apiPath };
+    // 标准化日期为 YYYY-MM-DD
+    const parts = m[1].split('-');
+    const date = parts[0] + '-' + parts[1].padStart(2,'0') + '-' + parts[2].padStart(2,'0');
+    return { date, year: parts[0], title: m[2].trim(), path: apiPath, type: isPdf ? 'pdf' : 'md' };
   }
-  // 无日期格式
-  const title = filename.replace(/\.md$/, '');
+  const title = filename.replace(ext, '').trim();
   const year = dirName || '其他';
-  return { date: '', year, title, path: apiPath };
+  return { date: '', year, title, path: apiPath, type: isPdf ? 'pdf' : 'md' };
 }
 
 // ========== 渲染列表 ==========
@@ -620,7 +624,8 @@ function renderFilteredList() {
     const div = document.createElement('div');
     div.className = 'article-item';
     div.dataset.path = a.path;
-    div.innerHTML = `<div class="title">${escHtml(a.title)}</div>${a.date ? `<div class="date">${a.date}</div>` : ''}`;
+    const badge = a.type === 'pdf' ? `<span style="font-size:10px;background:#f0e8da;color:#8b6f47;border-radius:3px;padding:1px 5px;margin-left:5px;vertical-align:middle">PDF</span>` : '';
+    div.innerHTML = `<div class="title">${escHtml(a.title)}${badge}</div>${a.date ? `<div class="date">${a.date}</div>` : ''}`;
     div.onclick = () => loadArticle(a, div);
     list.appendChild(div);
   });
@@ -652,9 +657,22 @@ async function loadArticle(article, el) {
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const json = await resp.json();
-    const text = decodeURIComponent(escape(atob(json.content.replace(/\n/g, ''))));
-    document.getElementById('md-body').innerHTML = marked.parse(text);
-    document.getElementById('md-body').scrollTop = 0;
+    const b64 = json.content.replace(/\n/g, '');
+
+    if (article.type === 'pdf') {
+      // 将 base64 转为 Blob URL 后用 iframe 渲染
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      document.getElementById('md-body').innerHTML =
+        `<iframe src="${url}" style="width:100%;height:100%;min-height:80vh;border:none;display:block"></iframe>`;
+    } else {
+      const text = decodeURIComponent(escape(atob(b64)));
+      document.getElementById('md-body').innerHTML = marked.parse(text);
+      document.getElementById('md-body').scrollTop = 0;
+    }
   } catch (e) {
     document.getElementById('md-body').innerHTML =
       `<div style="padding:40px;text-align:center;color:var(--danger)">
