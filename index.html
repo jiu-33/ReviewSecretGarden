@@ -567,7 +567,7 @@ function parseArticle(filename, apiPath, dirName) {
   }
   // 无日期格式
   const title = filename.replace(/\.md$/, '');
-  const year = dirName.match(/^\d{4}$/) ? dirName : '其他';
+  const year = dirName || '其他';
   return { date: '', year, title, path: apiPath };
 }
 
