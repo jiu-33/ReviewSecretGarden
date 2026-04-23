@@ -707,6 +707,8 @@ function escHtml(s) {
 window.onload = function() {
   const stored = LS.get('jm_token');
   if (stored) { TOKEN = stored; launchApp(); }
+  // 移动端默认显示目录
+  if (window.innerWidth <= 768) showTab('list');
 };
 </script>
 </body>
