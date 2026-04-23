@@ -609,12 +609,13 @@ function renderFilteredList() {
     list.innerHTML = '<div class="list-status"><p>暂无文章</p></div>';
     return;
   }
-  filtered.forEach(a => {
+  filtered.forEach((a, idx) => {
     const div = document.createElement('div');
     div.className = 'article-item';
     div.dataset.path = a.path;
     const badge = a.type === 'pdf' ? `<span style="font-size:10px;background:#f0e8da;color:#8b6f47;border-radius:3px;padding:1px 5px;margin-left:5px;vertical-align:middle">PDF</span>` : '';
-    div.innerHTML = `<div class="title">${escHtml(a.title)}${badge}</div>${a.date ? `<div class="date">${a.date}</div>` : ''}`;
+    const num = `<span style="font-size:11px;color:var(--text-muted);margin-right:6px;flex-shrink:0">${idx + 1}.</span>`;
+    div.innerHTML = `<div class="title" style="display:flex;align-items:baseline">${num}${escHtml(a.title)}${badge}</div>${a.date ? `<div class="date" style="padding-left:20px">${a.date}</div>` : ''}`;
     div.onclick = () => loadArticle(a, div);
     list.appendChild(div);
   });
