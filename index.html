@@ -168,6 +168,9 @@ body {
 }
 .article-item .date { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 .article-item.active .title { color: var(--accent); }
+.article-item.read .title { color: var(--text-muted); }
+.article-item.read.active .title { color: var(--accent); }
+.read-check { font-size: 11px; color: #7cb87c; margin-left: 5px; flex-shrink: 0; }
 
 /* 列表状态 */
 .list-status {
@@ -443,8 +446,10 @@ function switchRepo(repo) {
   document.getElementById('repo-select').value = repo;
   allArticles = [];
   currentYear = 'all';
+  readSet = new Set();
   clearReader();
   loadRepoArticles(repo);
+  loadGist();
 }
 
 function openAddRepo() {
@@ -619,11 +624,125 @@ function renderFilteredList() {
     div.onclick = () => loadArticle(a, div);
     list.appendChild(div);
   });
+  renderReadMarks();
 }
 
 function setListStatus(html) {
   document.getElementById('year-tabs').innerHTML = '';
   document.getElementById('article-list').innerHTML = `<div class="list-status">${html}</div>`;
+}
+
+// ========== Gist 已读记录 ==========
+const GIST_FILENAME = 'jm_read_history.json';
+let gistId = '';          // 缓存 Gist ID
+let readSet = new Set();  // 当前仓库已读 path 集合
+let gistDirty = false;    // 是否有未同步的变更
+
+// 用第一个仓库的 token 操作 Gist（Gist 与账号绑定，不区分仓库）
+function getGistToken() {
+  const list = getRepoList();
+  return list.length > 0 ? list[0].token : TOKEN;
+}
+
+async function loadGist() {
+  const token = getGistToken();
+  if (!token) return;
+  try {
+    // 查找已有的 Gist
+    const resp = await fetch('https://api.github.com/gists', {
+      headers: { Authorization: 'token ' + token }
+    });
+    if (!resp.ok) return;
+    const gists = await resp.json();
+    const found = gists.find(g => g.files && g.files[GIST_FILENAME]);
+    if (found) {
+      gistId = found.id;
+      // 拉取完整内容
+      const detail = await fetch('https://api.github.com/gists/' + gistId, {
+        headers: { Authorization: 'token ' + token }
+      });
+      if (!detail.ok) return;
+      const data = await detail.json();
+      const raw = data.files[GIST_FILENAME] && data.files[GIST_FILENAME].content;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // 加载当前仓库的已读列表
+        const arr = parsed[currentRepo] || [];
+        readSet = new Set(arr);
+        // 同时把完整数据缓存到 LS 供离线使用
+        LS.set('jm_gist_cache', parsed);
+        LS.set('jm_gist_id', gistId);
+      }
+    } else {
+      // 没有 Gist，尝试从缓存恢复
+      const cached = LS.get('jm_gist_cache');
+      if (cached && cached[currentRepo]) readSet = new Set(cached[currentRepo]);
+      gistId = LS.get('jm_gist_id') || '';
+    }
+  } catch {
+    // 网络失败时从缓存恢复
+    const cached = LS.get('jm_gist_cache');
+    if (cached && cached[currentRepo]) readSet = new Set(cached[currentRepo]);
+  }
+  renderReadMarks();
+}
+
+async function saveGist() {
+  const token = getGistToken();
+  if (!token) return;
+  // 合并全量数据
+  let all = LS.get('jm_gist_cache') || {};
+  all[currentRepo] = [...readSet];
+  LS.set('jm_gist_cache', all);
+  const content = JSON.stringify(all, null, 2);
+  try {
+    if (gistId) {
+      await fetch('https://api.github.com/gists/' + gistId, {
+        method: 'PATCH',
+        headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: { [GIST_FILENAME]: { content } } })
+      });
+    } else {
+      const resp = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: '记忆承载阅读器 - 已读记录',
+          public: false,
+          files: { [GIST_FILENAME]: { content } }
+        })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        gistId = data.id;
+        LS.set('jm_gist_id', gistId);
+      }
+    }
+  } catch { /* 网络失败，下次再同步 */ }
+  gistDirty = false;
+}
+
+function markRead(path) {
+  if (readSet.has(path)) return;
+  readSet.add(path);
+  gistDirty = true;
+  renderReadMarks();
+  saveGist();
+}
+
+function renderReadMarks() {
+  document.querySelectorAll('.article-item').forEach(el => {
+    const path = el.dataset.path;
+    const isRead = readSet.has(path);
+    el.classList.toggle('read', isRead);
+    // 更新勾号
+    const check = el.querySelector('.read-check');
+    if (isRead && !check) {
+      el.querySelector('.title').insertAdjacentHTML('beforeend', '<span class="read-check">✓</span>');
+    } else if (!isRead && check) {
+      check.remove();
+    }
+  });
 }
 
 // ========== 读取文章 ==========
@@ -650,7 +769,6 @@ async function loadArticle(article, el) {
     const b64 = json.content.replace(/\n/g, '');
 
     if (article.type === 'pdf') {
-      // 将 base64 转为 Blob URL 后用 iframe 渲染
       const binary = atob(b64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -663,6 +781,8 @@ async function loadArticle(article, el) {
       document.getElementById('md-body').innerHTML = marked.parse(text);
       document.getElementById('md-body').scrollTop = 0;
     }
+    // 标记已读
+    markRead(article.path);
   } catch (e) {
     document.getElementById('md-body').innerHTML =
       `<div style="padding:40px;text-align:center;color:var(--danger)">
