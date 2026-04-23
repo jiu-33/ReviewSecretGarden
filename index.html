@@ -171,6 +171,16 @@ body {
 .article-item.read .title { color: var(--text-muted); }
 .article-item.read.active .title { color: var(--accent); }
 .read-check { font-size: 11px; color: #7cb87c; margin-left: 5px; flex-shrink: 0; }
+.read-btn {
+  flex-shrink: 0; margin-left: auto; padding: 2px 7px;
+  border-radius: 20px; border: 1px solid var(--border);
+  font-size: 11px; color: var(--text-muted);
+  background: none; cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.read-btn:hover { border-color: #7cb87c; color: #7cb87c; }
+.read-btn.is-read { border-color: #7cb87c; color: #7cb87c; background: #edf7ed; }
+.read-btn.is-read:hover { border-color: var(--danger); color: var(--danger); background: #fdf0f0; }
 
 /* 列表状态 */
 .list-status {
@@ -620,7 +630,12 @@ function renderFilteredList() {
     div.dataset.path = a.path;
     const badge = a.type === 'pdf' ? `<span style="font-size:10px;background:#f0e8da;color:#8b6f47;border-radius:3px;padding:1px 5px;margin-left:5px;vertical-align:middle">PDF</span>` : '';
     const num = `<span style="font-size:11px;color:var(--text-muted);margin-right:6px;flex-shrink:0">${idx + 1}.</span>`;
-    div.innerHTML = `<div class="title" style="display:flex;align-items:baseline">${num}${escHtml(a.title)}${badge}</div>${a.date ? `<div class="date" style="padding-left:20px">${a.date}</div>` : ''}`;
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:4px">
+        <div class="title" style="display:flex;align-items:baseline;flex:1;min-width:0">${num}${escHtml(a.title)}${badge}</div>
+        <button class="read-btn" onclick="toggleRead(event,'${escAttr(a.path)}')">未读</button>
+      </div>
+      ${a.date ? `<div class="date" style="padding-left:20px">${a.date}</div>` : ''}`;
     div.onclick = () => loadArticle(a, div);
     list.appendChild(div);
   });
@@ -722,9 +737,14 @@ async function saveGist() {
   gistDirty = false;
 }
 
-function markRead(path) {
-  if (readSet.has(path)) return;
-  readSet.add(path);
+function toggleRead(event, path) {
+  event.stopPropagation(); // 防止触发文章点击
+  if (readSet.has(path)) {
+    if (!confirm('确认取消已读标记？')) return;
+    readSet.delete(path);
+  } else {
+    readSet.add(path);
+  }
   gistDirty = true;
   renderReadMarks();
   saveGist();
@@ -735,12 +755,10 @@ function renderReadMarks() {
     const path = el.dataset.path;
     const isRead = readSet.has(path);
     el.classList.toggle('read', isRead);
-    // 更新勾号
-    const check = el.querySelector('.read-check');
-    if (isRead && !check) {
-      el.querySelector('.title').insertAdjacentHTML('beforeend', '<span class="read-check">✓</span>');
-    } else if (!isRead && check) {
-      check.remove();
+    const btn = el.querySelector('.read-btn');
+    if (btn) {
+      btn.textContent = isRead ? '已读' : '未读';
+      btn.classList.toggle('is-read', isRead);
     }
   });
 }
@@ -781,8 +799,6 @@ async function loadArticle(article, el) {
       document.getElementById('md-body').innerHTML = marked.parse(text);
       document.getElementById('md-body').scrollTop = 0;
     }
-    // 标记已读
-    markRead(article.path);
   } catch (e) {
     document.getElementById('md-body').innerHTML =
       `<div style="padding:40px;text-align:center;color:var(--danger)">
