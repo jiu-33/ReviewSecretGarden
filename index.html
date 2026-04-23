@@ -510,46 +510,27 @@ function removeCurrentRepo() {
 }
 
 // ========== 动态加载文章列表 ==========
+async function fetchDir(repo, path) {
+  const url = API_BASE + repo + '/contents/' + (path ? path.split('/').map(encodeURIComponent).join('/') : '');
+  const r = await fetch(url, { headers: { Authorization: 'token ' + TOKEN } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
 async function loadRepoArticles(repo) {
   setListStatus('<div class="spinner"></div><p>正在读取目录…</p>');
   document.getElementById('year-tabs').innerHTML = '';
 
   try {
-    // 先获取仓库根目录
-    const rootResp = await fetch(API_BASE + repo + '/contents/', {
-      headers: { Authorization: 'token ' + TOKEN }
-    });
-    if (!rootResp.ok) throw new Error('HTTP ' + rootResp.status);
-    const rootItems = await rootResp.json();
+    const articles = [];
+    await scanDir(repo, '', articles, 0);
 
-    // 找出所有目录（年份目录 + 其他目录）
-    const dirs = rootItems.filter(i => i.type === 'dir');
-
-    if (dirs.length === 0) {
-      // 根目录直接有 .md 文件
-      const mdFiles = rootItems.filter(i => i.type === 'file' && i.name.endsWith('.md'));
-      allArticles = mdFiles.map(f => parseArticle(f.name, f.path, ''));
-      renderArticleList();
+    if (articles.length === 0) {
+      setListStatus('<p>此仓库中未找到 .md 文件</p>');
       return;
     }
 
-    // 并发获取各目录内容
-    const dirContents = await Promise.all(
-      dirs.map(d =>
-        fetch(API_BASE + repo + '/contents/' + encodeURIComponent(d.name), {
-          headers: { Authorization: 'token ' + TOKEN }
-        }).then(r => r.ok ? r.json() : []).catch(() => [])
-      )
-    );
-
-    allArticles = [];
-    dirs.forEach((dir, i) => {
-      const files = Array.isArray(dirContents[i]) ? dirContents[i] : [];
-      files.filter(f => f.type === 'file' && f.name.endsWith('.md')).forEach(f => {
-        allArticles.push(parseArticle(f.name, f.path, dir.name));
-      });
-    });
-
+    allArticles = articles;
     allArticles.sort((a, b) => b.date.localeCompare(a.date));
     renderArticleList();
 
@@ -559,6 +540,23 @@ async function loadRepoArticles(repo) {
     else if (msg.includes('404')) msg = '仓库不存在或无法访问';
     setListStatus(`<p>加载失败：${msg}</p>`);
   }
+}
+
+// 递归扫描目录，最多3层深度
+async function scanDir(repo, path, articles, depth) {
+  if (depth > 3) return;
+  const items = await fetchDir(repo, path);
+  if (!Array.isArray(items)) return;
+
+  const mdFiles = items.filter(i => i.type === 'file' && i.name.endsWith('.md'));
+  const dirs = items.filter(i => i.type === 'dir');
+
+  // 收集当前目录下的 .md 文件
+  const dirName = path ? path.split('/').pop() : '';
+  mdFiles.forEach(f => articles.push(parseArticle(f.name, f.path, dirName)));
+
+  // 并发递归子目录
+  await Promise.all(dirs.map(d => scanDir(repo, d.path, articles, depth + 1).catch(() => {})));
 }
 
 function parseArticle(filename, apiPath, dirName) {
