@@ -792,16 +792,36 @@ function showTab(tab) {
 
 // ========== 导读折叠 ==========
 function wrapFirstBlockquote(container) {
-  const bq = container.querySelector('blockquote');
-  if (!bq) return;
+  // 收集文章顶部连续的所有 blockquote（marked 会把空行分隔的 > 段落拆成多个元素）
+  const children = Array.from(container.childNodes);
+  const leadingBqs = [];
+  for (const node of children) {
+    if (node.nodeType === 1 && node.tagName === 'BLOCKQUOTE') {
+      leadingBqs.push(node);
+    } else if (node.nodeType === 3 && node.textContent.trim() === '') {
+      continue; // 跳过空文本节点
+    } else {
+      break; // 遇到非 blockquote 内容就停止
+    }
+  }
+  if (leadingBqs.length === 0) return;
+
+  // 用一个外层 blockquote 包裹所有导读段落
+  const wrapper = document.createElement('blockquote');
+  leadingBqs[0].parentNode.insertBefore(wrapper, leadingBqs[0]);
+  const content = document.createElement('div');
+  content.className = 'bq-content';
+  leadingBqs.forEach(bq => {
+    // 把每个 blockquote 的内容平铺进 content，保留段落结构
+    while (bq.firstChild) content.appendChild(bq.firstChild);
+    bq.remove();
+  });
+
   const toggle = document.createElement('div');
   toggle.className = 'bq-toggle';
   toggle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>导读`;
-  const content = document.createElement('div');
-  content.className = 'bq-content';
-  while (bq.firstChild) content.appendChild(bq.firstChild);
-  bq.appendChild(toggle);
-  bq.appendChild(content);
+  wrapper.appendChild(toggle);
+  wrapper.appendChild(content);
   toggle.onclick = () => {
     const open = content.classList.toggle('open');
     toggle.classList.toggle('open', open);
