@@ -490,7 +490,7 @@ function switchRepo(repo) {
 // ========== 动态加载文章列表 ==========
 async function fetchDir(repo, path) {
   const url = API_BASE + repo + '/contents/' + (path ? path.split('/').map(encodeURIComponent).join('/') : '');
-  const r = await fetch(url, { headers: { Authorization: 'token ' + TOKEN } });
+  const r = await fetch(url, { headers: { Authorization: 'token ' + TOKEN }, cache: 'no-cache' });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
