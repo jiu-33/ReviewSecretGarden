@@ -454,6 +454,8 @@ function doLogout() {
   document.getElementById('login-screen').style.display = 'flex';
   document.querySelectorAll('.identity-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('login-error').textContent = '';
+  const btn = document.getElementById('login-btn');
+  btn.textContent = '验证并进入'; btn.disabled = false;
 }
 
 // ========== 仓库管理 ==========
