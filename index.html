@@ -386,7 +386,7 @@ const API_BASE = 'https://api.github.com/repos/';
 
 let TOKEN = '';       // 当前仓库的 token
 let currentRepo = '';
-let currentYear = '2026';
+let currentYear = new Date().getFullYear().toString();
 let currentQuick = '';
 let allArticles = [];
 
