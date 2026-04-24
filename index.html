@@ -136,13 +136,28 @@ body {
 #year-tabs {
   display: flex; align-items: center; gap: 6px;
   padding: 10px 12px;
-  border-bottom: none;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0; flex-wrap: wrap;
 }
+#search-icon-btn {
+  margin-left: auto; flex-shrink: 0;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); padding: 2px 4px;
+  display: flex; align-items: center;
+  transition: color 0.15s;
+}
+#search-icon-btn:hover { color: var(--accent); }
 #search-wrap {
+  padding: 0 12px;
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.2s ease, padding 0.2s ease;
+  border-bottom: none;
+  flex-shrink: 0;
+}
+#search-wrap.open {
+  max-height: 60px;
   padding: 6px 12px 10px;
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
 }
 #search-input {
   width: 100%; padding: 7px 10px;
@@ -340,7 +355,13 @@ body {
         <select id="repo-select" onchange="switchRepo(this.value)"></select>
       </div>
     </div>
-    <div id="year-tabs"></div>
+    <div id="year-tabs">
+      <button id="search-icon-btn" onclick="toggleSearch()" title="搜索">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </button>
+    </div>
     <div id="search-wrap">
       <input type="text" id="search-input" placeholder="搜索文章标题…" autocomplete="off" spellcheck="false">
     </div>
@@ -638,6 +659,11 @@ function renderArticleList() {
   tabsEl.appendChild(sel);
 
   renderQuickBtns();
+
+  // 搜索图标始终在最右
+  const iconBtn = document.getElementById('search-icon-btn');
+  tabsEl.appendChild(iconBtn);
+
   renderFilteredList();
 }
 
@@ -665,6 +691,8 @@ function filterYear(year) {
   if (sel) sel.value = year;
   const si = document.getElementById('search-input');
   if (si) si.value = '';
+  const sw = document.getElementById('search-wrap');
+  if (sw) sw.classList.remove('open');
   renderQuickBtns();
   renderFilteredList();
 }
@@ -905,6 +933,19 @@ function escHtml(s) {
 function escAttr(s) { return String(s).replace(/"/g,'&quot;'); }
 
 // ========== 搜索框 ==========
+function toggleSearch() {
+  const wrap = document.getElementById('search-wrap');
+  const input = document.getElementById('search-input');
+  const isOpen = wrap.classList.toggle('open');
+  if (isOpen) {
+    setTimeout(() => input.focus(), 50);
+  } else {
+    input.value = '';
+    searchKeyword = '';
+    renderFilteredList();
+  }
+}
+
 document.getElementById('search-input').addEventListener('input', function() {
   searchKeyword = this.value.trim();
   renderFilteredList();
