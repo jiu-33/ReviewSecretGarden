@@ -242,6 +242,11 @@ body {
 #md-body a { color: var(--accent); text-decoration: none; }
 #md-body blockquote { border-left: 3px solid var(--accent-light); padding: 6px 12px; margin: 0.6em 0; color: var(--text-secondary); background: var(--item-hover); border-radius: 0 6px 6px 0; }
 #md-body blockquote p { font-size: 13.5px; line-height: 1.75; margin: 0; }
+.bq-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; font-size: 12px; color: var(--accent); font-weight: 600; padding: 2px 0; }
+.bq-toggle svg { flex-shrink: 0; transition: transform 0.2s; }
+.bq-toggle.open svg { transform: rotate(90deg); }
+.bq-content { overflow: hidden; max-height: 0; transition: max-height 0.25s ease; }
+.bq-content.open { max-height: 2000px; }
 #md-body hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
 #md-body strong { font-weight: 700; }
 
@@ -757,6 +762,7 @@ async function loadArticle(article, el) {
       const raw = decodeURIComponent(escape(atob(b64)));
       const text = raw.replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
       document.getElementById('md-body').innerHTML = marked.parse(text);
+      wrapFirstBlockquote(document.getElementById('md-body'));
       document.getElementById('md-body').scrollTop = 0;
     }
   } catch (e) {
@@ -782,6 +788,24 @@ function showTab(tab) {
   document.getElementById('tab-list').classList.toggle('active', tab === 'list');
   document.getElementById('tab-read').classList.toggle('active', tab === 'read');
   sidebar.classList.toggle('visible', tab === 'list');
+}
+
+// ========== 导读折叠 ==========
+function wrapFirstBlockquote(container) {
+  const bq = container.querySelector('blockquote');
+  if (!bq) return;
+  const toggle = document.createElement('div');
+  toggle.className = 'bq-toggle';
+  toggle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>导读`;
+  const content = document.createElement('div');
+  content.className = 'bq-content';
+  while (bq.firstChild) content.appendChild(bq.firstChild);
+  bq.appendChild(toggle);
+  bq.appendChild(content);
+  toggle.onclick = () => {
+    const open = content.classList.toggle('open');
+    toggle.classList.toggle('open', open);
+  };
 }
 
 // ========== 工具 ==========
