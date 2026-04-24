@@ -78,6 +78,13 @@ body {
 }
 .btn-primary:active { transform: scale(0.98); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.identity-btn {
+  flex: 1; padding: 10px;
+  border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: 15px; font-weight: 600; color: var(--text-secondary);
+  background: none; cursor: pointer; transition: all 0.15s;
+}
+.identity-btn.selected { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
 #login-error { margin-top: 10px; font-size: 13px; color: var(--danger); text-align: center; min-height: 18px; }
 #login-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); text-align: center; line-height: 1.8; }
 
@@ -276,7 +283,12 @@ body {
 <div id="login-screen">
   <div id="login-card">
     <h2>记忆承载</h2>
-    <p class="subtitle">添加第一个仓库以开始阅读</p>
+    <p class="subtitle">选择身份后开始阅读</p>
+    <label class="form-label">身份选择</label>
+    <div id="identity-btns" style="display:flex;gap:10px;margin-bottom:16px;">
+      <button class="identity-btn" data-name="Jiu" onclick="selectIdentity('Jiu')">Jiu</button>
+      <button class="identity-btn" data-name="Keen" onclick="selectIdentity('Keen')">Keen</button>
+    </div>
     <label class="form-label" for="login-repo-input">仓库地址</label>
     <input type="text" id="login-repo-input" class="form-input" placeholder="owner/repo-name" autocomplete="off" spellcheck="false" value="jiu-33/SecretGarden">
     <label class="form-label" style="margin-top:14px" for="token-input">Personal Access Token</label>
@@ -284,7 +296,6 @@ body {
     <p class="form-hint">需要 <strong>repo</strong> 权限。Token 与仓库绑定，仅保存在本设备浏览器中。</p>
     <button class="btn-primary" id="login-btn" onclick="doLogin()">验证并进入</button>
     <p id="login-error"></p>
-    <div id="login-footer">每个仓库可绑定独立的 Token，切换仓库时自动切换</div>
   </div>
 </div>
 
@@ -292,7 +303,13 @@ body {
 <div id="app" style="display:none">
   <div id="sidebar">
     <div id="sidebar-top">
-      <h1>记忆承载</h1>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h1 style="margin-bottom:0;">记忆承载</h1>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="current-identity" style="font-size:12px;color:var(--accent);font-weight:600;background:var(--accent-light);padding:2px 8px;border-radius:10px;"></span>
+          <button onclick="doLogout()" title="退出登录" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:11px;padding:2px 4px;">退出</button>
+        </div>
+      </div>
       <div id="repo-selector-wrap">
         <select id="repo-select" onchange="switchRepo(this.value)"></select>
         <button id="refresh-btn" onclick="refreshRepo()" title="刷新目录" style="flex-shrink:0;background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px 4px;display:flex;align-items:center;transition:color 0.15s;">
@@ -351,6 +368,7 @@ const API_BASE = 'https://api.github.com/repos/';
 
 let TOKEN = '';
 let currentRepo = '';
+let currentUser = '';   // 'Jiu' 或 'Keen'
 let currentYear = new Date().getFullYear().toString();
 let currentQuick = '';
 let searchKeyword = '';
@@ -371,9 +389,17 @@ function getTokenForRepo(repo) {
 }
 
 // ========== 登录 ==========
+function selectIdentity(name) {
+  currentUser = name;
+  document.querySelectorAll('.identity-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.name === name);
+  });
+}
+
 function doLogin() {
   const repo  = document.getElementById('login-repo-input').value.trim();
   const token = document.getElementById('token-input').value.trim();
+  if (!currentUser) { showLoginError('请先选择身份'); return; }
   if (!repo || !repo.includes('/')) { showLoginError('仓库格式错误，请填写 owner/repo'); return; }
   if (!token) { showLoginError('请输入 Token'); return; }
   const btn = document.getElementById('login-btn');
@@ -387,6 +413,7 @@ function doLogin() {
         list.unshift({ repo, token });
         saveRepoList(list);
         TOKEN = token;
+        LS.set('jm_user', currentUser);
         launchApp();
       } else if (r.status === 401 || r.status === 403) {
         showLoginError('Token 无效或权限不足');
@@ -412,9 +439,21 @@ document.getElementById('login-repo-input').addEventListener('keydown', e => { i
 function launchApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  document.getElementById('current-identity').textContent = currentUser;
   buildRepoSelector();
   const list = getRepoList();
   if (list.length > 0) switchRepo(list[0].repo);
+}
+
+function doLogout() {
+  LS.remove('jm_user');
+  LS.remove('jm_gist_cache');
+  LS.remove('jm_gist_id');
+  currentUser = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.querySelectorAll('.identity-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('login-error').textContent = '';
 }
 
 // ========== 仓库管理 ==========
@@ -633,10 +672,11 @@ function getGistToken() {
   return list.length > 0 ? list[0].token : TOKEN;
 }
 
+function repoKey() { return currentUser + '::' + currentRepo; }
+
 function getRepoData(all) {
-  const d = all[currentRepo];
+  const d = all[repoKey()];
   if (!d || Array.isArray(d)) return { read: [], recent: [] };
-  // recent 条目必须是对象格式，否则清空
   const recent = (d.recent || []).filter(r => r && typeof r === 'object' && r.path);
   return { read: d.read || [], recent };
 }
@@ -692,8 +732,7 @@ async function saveGist() {
   const token = getGistToken();
   if (!token) return;
   let all = LS.get('jm_gist_cache') || {};
-  if (Array.isArray(all[currentRepo])) delete all[currentRepo]; // 清除旧格式
-  all[currentRepo] = { read: [...readSet], recent: recentList };
+  all[repoKey()] = { read: [...readSet], recent: recentList };
   LS.set('jm_gist_cache', all);
   const content = JSON.stringify(all, null, 2);
   try {
@@ -934,11 +973,12 @@ document.getElementById('search-input').addEventListener('input', function() {
 
 // ========== 初始化 ==========
 window.onload = function() {
-  // 清除旧格式缓存，强制使用新数据结构
   LS.remove('jm_gist_cache');
   LS.remove('jm_gist_id');
+  const savedUser = LS.get('jm_user');
   const list = getRepoList();
-  if (list.length > 0) {
+  if (savedUser && list.length > 0) {
+    currentUser = savedUser;
     TOKEN = list[0].token;
     launchApp();
   }
