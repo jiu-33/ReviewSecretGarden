@@ -882,6 +882,8 @@ function enterEditMode() {
   mdBody.innerHTML = '';
   mdBody.appendChild(ta);
   ta.focus();
+  ta.setSelectionRange(0, 0);
+  ta.scrollTop = 0;
 
   const editBtn = document.getElementById('reader-edit-btn');
   editBtn.textContent = '取消';
