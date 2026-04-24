@@ -792,16 +792,19 @@ function showTab(tab) {
 
 // ========== 导读折叠 ==========
 function wrapFirstBlockquote(container) {
-  // 收集文章顶部连续的所有 blockquote（marked 会把空行分隔的 > 段落拆成多个元素）
+  // 跳过开头的标题和空文本节点，收集紧随其后连续的所有 blockquote
   const children = Array.from(container.childNodes);
   const leadingBqs = [];
+  let pastHeader = false;
   for (const node of children) {
+    if (node.nodeType === 3 && node.textContent.trim() === '') continue;
+    if (!pastHeader && node.nodeType === 1 && /^H[1-3]$/.test(node.tagName)) {
+      pastHeader = true; continue;
+    }
     if (node.nodeType === 1 && node.tagName === 'BLOCKQUOTE') {
       leadingBqs.push(node);
-    } else if (node.nodeType === 3 && node.textContent.trim() === '') {
-      continue; // 跳过空文本节点
     } else {
-      break; // 遇到非 blockquote 内容就停止
+      break;
     }
   }
   if (leadingBqs.length === 0) return;
