@@ -786,7 +786,7 @@ async function saveGist() {
         LS.set('jm_gist_id', gistId);
       }
     }
-  } catch { /* 网络失败，下次再同步 */ }
+  } catch (e) { gistDirty = false; throw e; }
   gistDirty = false;
 }
 
@@ -844,7 +844,8 @@ function renderRecentSection() {
 
 function toggleRead(event, path) {
   event.stopPropagation();
-  if (readSet.has(path)) {
+  const wasRead = readSet.has(path);
+  if (wasRead) {
     if (!confirm('确认取消已读标记？')) return;
     readSet.delete(path);
   } else {
@@ -852,7 +853,9 @@ function toggleRead(event, path) {
   }
   gistDirty = true;
   renderReadMarks();
-  saveGist();
+  saveGist()
+    .then(() => showToast(wasRead ? '已取消已读' : '已标记为已读'))
+    .catch(() => showToast('同步失败，请检查网络', 'error'));
 }
 
 function renderReadMarks() {
