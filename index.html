@@ -633,7 +633,7 @@ function renderQuickBtns() {
   const tabsEl = document.getElementById('year-tabs');
   const curYear = new Date().getFullYear().toString();
   if (currentYear === 'all' || currentYear === curYear) {
-    ['近一周', '近一月'].forEach(label => {
+    ['近一周', '近两周', '近一月'].forEach(label => {
       const btn = document.createElement('button');
       btn.className = 'quick-btn' + (currentQuick === label ? ' active' : '');
       btn.textContent = label;
@@ -666,7 +666,7 @@ function renderFilteredList() {
   let filtered = currentYear === 'all' ? allArticles : allArticles.filter(a => a.year === currentYear);
   if (currentQuick) {
     const now = new Date();
-    const days = currentQuick === '近一周' ? 7 : 30;
+    const days = currentQuick === '近一周' ? 7 : currentQuick === '近两周' ? 14 : 30;
     const cutoff = new Date(now - days * 86400000);
     filtered = filtered.filter(a => a.date && new Date(a.date) >= cutoff);
   }
