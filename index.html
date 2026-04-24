@@ -877,7 +877,7 @@ async function loadArticle(article, el) {
   document.getElementById('article-title').innerHTML = paidBadge + escHtml(article.title);
   document.getElementById('article-date').textContent = article.date;
   document.getElementById('reader-identity').textContent = currentUser;
-  document.getElementById('main-header').style.display = '';
+  document.getElementById('main-header').style.display = 'block';
   document.getElementById('placeholder').style.display = 'none';
   document.getElementById('md-body').style.display = 'block';
   document.getElementById('md-body').innerHTML = '<div style="display:flex;justify-content:center;padding:60px 0"><div class="spinner"></div></div>';
