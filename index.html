@@ -336,6 +336,7 @@ body {
         </button>
         <span style="flex:1;"></span>
         <span id="reader-identity" style="font-size:11px;color:var(--accent);font-weight:600;background:var(--accent-light);padding:2px 7px;border-radius:10px;flex-shrink:0;"></span>
+        <button id="reader-edit-btn" onclick="enterEditMode()" style="display:none;flex-shrink:0;padding:3px 10px;border-radius:20px;border:1px solid var(--border);font-size:12px;color:var(--text-muted);background:none;cursor:pointer;white-space:nowrap;">编辑</button>
         <button id="reader-read-btn" onclick="toggleReadCurrent()" style="flex-shrink:0;padding:3px 10px;border-radius:20px;border:1px solid var(--border);font-size:12px;color:var(--text-muted);background:none;cursor:pointer;white-space:nowrap;">未读</button>
       </div>
     </div>
@@ -354,8 +355,10 @@ const API_BASE = 'https://api.github.com/repos/';
 
 let TOKEN = '';
 let currentRepo = '';
-let currentUser = '';   // 'Jiu' 或 'Keen'
+let currentUser = '';
 let currentYear = new Date().getFullYear().toString();
+let currentFileSha = '';
+let currentRawText = '';
 let currentQuick = '';
 let searchKeyword = '';
 let allArticles = [];
@@ -868,6 +871,79 @@ function renderReadMarks() {
   if (currentArticle) updateReaderReadBtn(currentArticle.path);
 }
 
+// ========== 编辑文章 ==========
+function enterEditMode() {
+  const mdBody = document.getElementById('md-body');
+  const ta = document.createElement('textarea');
+  ta.id = 'edit-textarea';
+  ta.value = currentRawText;
+  ta.style.cssText = 'width:100%;height:100%;min-height:calc(100vh - 120px);padding:16px;font-size:14px;font-family:monospace;line-height:1.7;border:none;outline:none;resize:none;background:var(--bg);color:var(--text);';
+  mdBody.innerHTML = '';
+  mdBody.appendChild(ta);
+  ta.focus();
+
+  const editBtn = document.getElementById('reader-edit-btn');
+  editBtn.textContent = '取消';
+  editBtn.onclick = exitEditMode;
+
+  const readBtn = document.getElementById('reader-read-btn');
+  readBtn.style.display = 'none';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.id = 'reader-save-btn';
+  saveBtn.textContent = '保存';
+  saveBtn.style.cssText = 'flex-shrink:0;padding:3px 10px;border-radius:20px;border:none;font-size:12px;color:#fff;background:var(--accent);cursor:pointer;white-space:nowrap;';
+  saveBtn.onclick = saveArticle;
+  editBtn.parentNode.insertBefore(saveBtn, editBtn);
+}
+
+function exitEditMode() {
+  const editBtn = document.getElementById('reader-edit-btn');
+  editBtn.textContent = '编辑';
+  editBtn.onclick = enterEditMode;
+  document.getElementById('reader-read-btn').style.display = '';
+  const saveBtn = document.getElementById('reader-save-btn');
+  if (saveBtn) saveBtn.remove();
+
+  const text = currentRawText.replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
+  const mdBody = document.getElementById('md-body');
+  mdBody.innerHTML = marked.parse(text);
+  injectArticleTitle(mdBody, currentArticle);
+  wrapFirstBlockquote(mdBody);
+  mdBody.scrollTop = 0;
+}
+
+async function saveArticle() {
+  const ta = document.getElementById('edit-textarea');
+  if (!ta) return;
+  const newText = ta.value;
+  const saveBtn = document.getElementById('reader-save-btn');
+  saveBtn.textContent = '保存中…'; saveBtn.disabled = true;
+
+  try {
+    const encodedPath = currentArticle.path.split('/').map(encodeURIComponent).join('/');
+    const content = btoa(unescape(encodeURIComponent(newText)));
+    const resp = await fetch(API_BASE + currentRepo + '/contents/' + encodedPath, {
+      method: 'PUT',
+      headers: { Authorization: 'token ' + TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: 'update: ' + currentArticle.title,
+        content,
+        sha: currentFileSha
+      })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    currentRawText = newText;
+    currentFileSha = data.content.sha;
+    exitEditMode();
+    showToast('已保存并推送');
+  } catch (e) {
+    saveBtn.textContent = '保存'; saveBtn.disabled = false;
+    showToast('保存失败：' + e.message, 'error');
+  }
+}
+
 // ========== 读取文章 ==========
 async function loadArticle(article, el) {
   currentArticle = article;
@@ -903,6 +979,10 @@ async function loadArticle(article, el) {
       updateRecent(article.path);
     } else {
       const raw = decodeURIComponent(escape(atob(b64)));
+      currentRawText = raw;
+      currentFileSha = json.sha;
+      const editBtn = document.getElementById('reader-edit-btn');
+      if (editBtn) editBtn.style.display = currentUser === 'Jiu' ? '' : 'none';
       const text = raw.replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
       const mdBody = document.getElementById('md-body');
       mdBody.innerHTML = marked.parse(text);
