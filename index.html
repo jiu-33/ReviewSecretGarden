@@ -900,7 +900,8 @@ async function loadArticle(article, el) {
   document.querySelectorAll('.article-item').forEach(d => d.classList.remove('active'));
   if (el) el.classList.add('active');
 
-  document.getElementById('article-title').textContent = article.title;
+  const paidBadge = article.isPaid ? `<span style="font-size:11px;background:#fff8e6;color:#c8860a;border:1px solid #f0d080;border-radius:3px;padding:1px 6px;margin-right:6px;vertical-align:middle;font-weight:500;">付</span>` : '';
+  document.getElementById('article-title').innerHTML = paidBadge + escHtml(article.title);
   document.getElementById('article-date').textContent = article.date;
   document.getElementById('main-header').style.display = '';
   document.getElementById('placeholder').style.display = 'none';
