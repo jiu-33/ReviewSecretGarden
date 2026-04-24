@@ -621,7 +621,7 @@ function setListStatus(html) {
 }
 
 // ========== Gist 已读记录 ==========
-// 数据结构：{ "owner/repo": { read: ["path",...], recent: ["path",...] } }
+// 数据结构：{ "owner/repo": { read: ["path",...], recent: [{path, time},...] } }
 const GIST_FILENAME = 'jm_read_history.json';
 let gistId = '';
 let readSet = new Set();   // 当前仓库已读路径
@@ -635,8 +635,10 @@ function getGistToken() {
 
 function getRepoData(all) {
   const d = all[currentRepo];
-  if (!d || Array.isArray(d)) return { read: [], recent: [] }; // 兼容旧格式直接清空
-  return { read: d.read || [], recent: d.recent || [] };
+  if (!d || Array.isArray(d)) return { read: [], recent: [] };
+  // recent 条目必须是对象格式，否则清空
+  const recent = (d.recent || []).filter(r => r && typeof r === 'object' && r.path);
+  return { read: d.read || [], recent };
 }
 
 async function loadGist() {
@@ -722,9 +724,21 @@ async function saveGist() {
 }
 
 function updateRecent(path) {
-  recentList = [path, ...recentList.filter(p => p !== path)].slice(0, 3);
+  const entry = { path, time: new Date().toISOString() };
+  recentList = [entry, ...recentList.filter(r => r.path !== path)].slice(0, 3);
   saveGist();
   renderRecentSection();
+}
+
+function formatRecentTime(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+  if (diff < 86400000 * 3) return Math.floor(diff / 86400000) + '天前';
+  return (d.getMonth() + 1) + '/' + d.getDate();
 }
 
 function renderRecentSection() {
@@ -732,18 +746,22 @@ function renderRecentSection() {
   if (existing) existing.remove();
   if (recentList.length === 0 || allArticles.length === 0) return;
 
-  const articles = recentList.map(p => allArticles.find(a => a.path === p)).filter(Boolean);
-  if (articles.length === 0) return;
+  const entries = recentList.map(r => ({
+    article: allArticles.find(a => a.path === r.path),
+    time: r.time
+  })).filter(e => e.article);
+  if (entries.length === 0) return;
 
   const section = document.createElement('div');
   section.id = 'recent-section';
   section.style.cssText = 'padding:8px 14px 4px;border-bottom:1px solid var(--border);flex-shrink:0;';
   section.innerHTML = `<div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;letter-spacing:0.5px;">最近阅读</div>`;
-  articles.forEach(a => {
+  entries.forEach(({ article: a, time }) => {
     const item = document.createElement('div');
-    item.style.cssText = 'font-size:12px;color:var(--text-secondary);padding:3px 0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px;';
+    item.style.cssText = 'font-size:12px;color:var(--text-secondary);padding:3px 0;cursor:pointer;display:flex;align-items:center;gap:4px;';
     const paidBadge = a.isPaid ? `<span style="font-size:10px;background:#fff8e6;color:#c8860a;border:1px solid #f0d080;border-radius:3px;padding:1px 4px;flex-shrink:0;">付</span>` : '';
-    item.innerHTML = paidBadge + `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.title)}</span>`;
+    const timeStr = time ? `<span style="font-size:11px;color:var(--text-muted);flex-shrink:0;margin-left:auto;padding-left:6px;">${formatRecentTime(time)}</span>` : '';
+    item.innerHTML = paidBadge + `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${escHtml(a.title)}</span>` + timeStr;
     item.onclick = () => {
       loadArticle(a, null);
       document.querySelectorAll('.article-item').forEach(el => {
