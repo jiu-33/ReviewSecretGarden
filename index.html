@@ -351,8 +351,13 @@ body {
   <div id="sidebar">
     <div id="sidebar-top">
       <h1>记忆承载</h1>
-      <div id="repo-selector-wrap">
-        <select id="repo-select" onchange="switchRepo(this.value)"></select>
+      <div id="repo-selector-wrap" style="display:flex;align-items:center;gap:6px;">
+        <select id="repo-select" onchange="switchRepo(this.value)" style="flex:1;"></select>
+        <button id="refresh-btn" onclick="refreshRepo()" title="刷新目录" style="flex-shrink:0;background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px 4px;display:flex;align-items:center;transition:color 0.15s;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        </button>
       </div>
     </div>
     <div id="year-tabs-wrap" style="display:flex;align-items:center;border-bottom:1px solid var(--border);flex-shrink:0;">
@@ -495,6 +500,14 @@ function buildRepoSelector() {
   const list = getRepoList();
   sel.innerHTML = list.map(e => `<option value="${escAttr(e.repo)}">${escHtml(e.repo)}</option>`).join('');
   if (currentRepo) sel.value = currentRepo;
+}
+
+function refreshRepo() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) btn.style.animation = 'spin 0.8s linear infinite';
+  loadRepoArticles(currentRepo).finally(() => {
+    if (btn) btn.style.animation = '';
+  });
 }
 
 function switchRepo(repo) {
