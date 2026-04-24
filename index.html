@@ -92,7 +92,7 @@ body {
   display: flex; flex-direction: column;
   overflow: hidden;
   transform: translateX(-100%); transition: transform 0.25s ease;
-  padding-bottom: 60px;
+  padding-bottom: 48px;
 }
 #sidebar.visible { transform: translateX(0); }
 
@@ -212,7 +212,7 @@ body {
 .list-status p { font-size: 13px; text-align: center; line-height: 1.7; }
 
 /* 主阅读区 */
-#main { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding-bottom: 56px; }
+#main { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding-bottom: 44px; }
 #main-header {
   padding: 14px 16px 10px;
   border-bottom: 1px solid var(--border);
@@ -249,19 +249,19 @@ body {
 #tab-bar {
   display: flex;
   position: fixed; bottom: 0; left: 0; right: 0;
-  height: 56px; z-index: 200;
+  height: 44px; z-index: 200;
   background: var(--tab-bg);
   border-top: 1px solid var(--tab-border);
   box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
 }
 .tab-btn {
   flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 3px;
+  align-items: center; justify-content: center; gap: 2px;
   background: none; border: none; cursor: pointer;
-  color: var(--text-muted); font-size: 11px; font-weight: 500;
+  color: var(--text-muted); font-size: 10px; font-weight: 500;
   transition: color 0.15s;
 }
-.tab-btn svg { width: 22px; height: 22px; }
+.tab-btn svg { width: 18px; height: 18px; }
 .tab-btn.active { color: var(--accent); }
 </style>
 </head>
