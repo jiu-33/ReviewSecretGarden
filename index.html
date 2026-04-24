@@ -821,11 +821,22 @@ function renderRecentSection() {
 
   const section = document.createElement('div');
   section.id = 'recent-section';
-  section.style.cssText = 'padding:8px 14px 4px;border-bottom:1px solid var(--border);flex-shrink:0;';
-  section.innerHTML = `<div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;letter-spacing:0.5px;">最近阅读</div>`;
+  section.style.cssText = 'flex-shrink:0;box-shadow:0 3px 8px rgba(0,0,0,0.07);';
+
+  // 标题行（点击展开/收起）
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;gap:6px;padding:10px 14px 10px;cursor:pointer;user-select:none;';
+  header.innerHTML = `<svg id="recent-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;color:var(--text-muted);transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg><span style="font-size:15px;font-weight:600;color:var(--text);">最近阅读</span>`;
+  section.appendChild(header);
+
+  // 内容区（默认收起）
+  const body = document.createElement('div');
+  body.id = 'recent-body';
+  body.style.cssText = 'overflow:hidden;max-height:0;transition:max-height 0.25s ease;';
+
   entries.forEach(({ article: a, time }) => {
     const item = document.createElement('div');
-    item.style.cssText = 'font-size:12px;color:var(--text-secondary);padding:3px 0;cursor:pointer;display:flex;align-items:center;gap:4px;';
+    item.style.cssText = 'font-size:12px;color:var(--text-secondary);padding:5px 14px;cursor:pointer;display:flex;align-items:center;gap:4px;';
     const paidBadge = a.isPaid ? `<span style="font-size:10px;background:#fff8e6;color:#c8860a;border:1px solid #f0d080;border-radius:3px;padding:1px 4px;flex-shrink:0;">付</span>` : '';
     const timeStr = time ? `<span style="font-size:11px;color:var(--text-muted);flex-shrink:0;margin-left:auto;padding-left:6px;">${formatRecentTime(time)}</span>` : '';
     item.innerHTML = paidBadge + `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${escHtml(a.title)}</span>` + timeStr;
@@ -835,8 +846,21 @@ function renderRecentSection() {
         el.classList.toggle('active', el.dataset.path === a.path);
       });
     };
-    section.appendChild(item);
+    body.appendChild(item);
   });
+
+  // 底部留白
+  const pad = document.createElement('div');
+  pad.style.cssText = 'height:6px;';
+  body.appendChild(pad);
+
+  section.appendChild(body);
+
+  header.onclick = () => {
+    const open = body.style.maxHeight === '0px' || body.style.maxHeight === '';
+    body.style.maxHeight = open ? body.scrollHeight + 'px' : '0px';
+    document.getElementById('recent-arrow').style.transform = open ? 'rotate(90deg)' : '';
+  };
 
   const articleList = document.getElementById('article-list');
   articleList.parentNode.insertBefore(section, articleList);
