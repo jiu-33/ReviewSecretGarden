@@ -284,14 +284,14 @@ body {
   <div id="login-card">
     <h2>记忆承载</h2>
     <p class="subtitle">选择身份后开始阅读</p>
-    <label class="form-label">身份选择</label>
+    <label class="form-label">身份选择 <span style="color:#e05c5c">*</span></label>
     <div id="identity-btns" style="display:flex;gap:10px;margin-bottom:16px;">
       <button class="identity-btn" data-name="Jiu" onclick="selectIdentity('Jiu')">Jiu</button>
       <button class="identity-btn" data-name="Keen" onclick="selectIdentity('Keen')">Keen</button>
     </div>
-    <label class="form-label" for="login-repo-input">仓库地址</label>
+    <label class="form-label" for="login-repo-input">仓库地址 <span style="color:#e05c5c">*</span></label>
     <input type="text" id="login-repo-input" class="form-input" placeholder="owner/repo-name" autocomplete="off" spellcheck="false" value="jiu-33/SecretGarden">
-    <label class="form-label" style="margin-top:14px" for="token-input">Personal Access Token</label>
+    <label class="form-label" style="margin-top:14px" for="token-input">Personal Access Token <span style="color:#e05c5c">*</span></label>
     <input type="password" id="token-input" class="form-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
     <p class="form-hint">需要 <strong>repo</strong> 权限。Token 与仓库绑定，仅保存在本设备浏览器中。</p>
     <button class="btn-primary" id="login-btn" onclick="doLogin()">验证并进入</button>
