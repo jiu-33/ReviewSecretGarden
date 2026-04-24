@@ -878,7 +878,7 @@ function toggleRead(event, path) {
   gistDirty = true;
   renderReadMarks();
   saveGist()
-    .then(() => showToast(wasRead ? '已取消已读' : '已标记为已读'))
+    .then(() => showToast(wasRead ? '已取消标记' : '已标记'))
     .catch(() => showToast('同步失败，请检查网络', 'error'));
 }
 
