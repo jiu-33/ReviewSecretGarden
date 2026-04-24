@@ -566,17 +566,19 @@ async function scanDir(repo, path, articles, depth) {
 function parseArticle(filename, apiPath, dirName) {
   const isPdf = filename.toLowerCase().endsWith('.pdf');
   const ext = isPdf ? /\.pdf$/i : /\.md$/i;
+  const isPaid = filename.includes('「付」');
   // 尝试从文件名解析日期和标题，格式：YYYY-MM-DD_标题.ext 或 YYYY-M-D_标题.ext
   const m = filename.match(/^(\d{4}-\d{1,2}-\d{1,2})_(.+)\.(md|pdf)$/i);
   if (m) {
     // 标准化日期为 YYYY-MM-DD
     const parts = m[1].split('-');
     const date = parts[0] + '-' + parts[1].padStart(2,'0') + '-' + parts[2].padStart(2,'0');
-    return { date, year: parts[0], title: m[2].trim(), path: apiPath, type: isPdf ? 'pdf' : 'md' };
+    const title = m[2].trim().replace('「付」', '');
+    return { date, year: parts[0], title, path: apiPath, type: isPdf ? 'pdf' : 'md', isPaid };
   }
-  const title = filename.replace(ext, '').trim();
+  const title = filename.replace(ext, '').replace('「付」', '').trim();
   const year = dirName || '其他';
-  return { date: '', year, title, path: apiPath, type: isPdf ? 'pdf' : 'md' };
+  return { date: '', year, title, path: apiPath, type: isPdf ? 'pdf' : 'md', isPaid };
 }
 
 // ========== 渲染列表 ==========
@@ -629,10 +631,11 @@ function renderFilteredList() {
     div.className = 'article-item';
     div.dataset.path = a.path;
     const badge = a.type === 'pdf' ? `<span style="font-size:10px;background:#f0e8da;color:#8b6f47;border-radius:3px;padding:1px 5px;margin-left:5px;vertical-align:middle">PDF</span>` : '';
+    const paidBadge = a.isPaid ? `<span style="font-size:10px;background:#fff8e6;color:#c8860a;border:1px solid #f0d080;border-radius:3px;padding:1px 5px;margin-right:5px;flex-shrink:0;vertical-align:middle">付</span>` : '';
     const num = `<span style="font-size:11px;color:var(--text-muted);margin-right:6px;flex-shrink:0">${idx + 1}.</span>`;
     div.innerHTML = `
       <div style="display:flex;align-items:center;gap:4px">
-        <div class="title" style="display:flex;align-items:baseline;flex:1;min-width:0">${num}${escHtml(a.title)}${badge}</div>
+        <div class="title" style="display:flex;align-items:baseline;flex:1;min-width:0">${num}${paidBadge}${escHtml(a.title)}${badge}</div>
         <button class="read-btn" onclick="toggleRead(event,'${escAttr(a.path)}')">未读</button>
       </div>
       ${a.date ? `<div class="date" style="padding-left:20px">${a.date}</div>` : ''}`;
