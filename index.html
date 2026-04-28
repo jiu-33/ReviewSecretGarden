@@ -990,6 +990,7 @@ async function loadArticle(article, el) {
       const text = raw.replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
       const mdBody = document.getElementById('md-body');
       mdBody.innerHTML = marked.parse(text);
+      resolveWikiLinks(mdBody);
       injectArticleTitle(mdBody, article);
       wrapFirstBlockquote(mdBody);
       mdBody.scrollTop = 0;
@@ -1060,6 +1061,43 @@ function injectArticleTitle(container, article) {
     header.innerHTML = badge + escHtml(article.title);
     container.insertBefore(header, container.firstChild);
   }
+}
+
+// ========== Wiki 链接解析 ==========
+function resolveWikiLinks(container) {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const toReplace = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (/\[\[.+?\]\]/.test(node.textContent)) toReplace.push(node);
+  }
+  toReplace.forEach(textNode => {
+    const frag = document.createDocumentFragment();
+    const parts = textNode.textContent.split(/(\[\[.+?\]\])/);
+    parts.forEach(part => {
+      const m = part.match(/^\[\[(.+?)\]\]$/);
+      if (m) {
+        const linkName = m[1];
+        const article = allArticles.find(a => {
+          const base = a.path.split('/').pop().replace(/\.md$/i, '');
+          return base === linkName;
+        });
+        const span = document.createElement('span');
+        if (article) {
+          span.textContent = article.title || linkName;
+          span.style.cssText = 'color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px;';
+          span.onclick = () => loadArticle(article, null);
+        } else {
+          span.textContent = linkName;
+          span.style.cssText = 'color:var(--text-secondary);';
+        }
+        frag.appendChild(span);
+      } else {
+        frag.appendChild(document.createTextNode(part));
+      }
+    });
+    textNode.parentNode.replaceChild(frag, textNode);
+  });
 }
 
 // ========== 导读折叠 ==========
