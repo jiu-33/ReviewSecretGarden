@@ -127,6 +127,21 @@ body {
   transform: translateY(-50%); pointer-events: none;
   color: var(--text-muted); font-size: 12px;
 }
+#dir-select {
+  width: 90px; flex-shrink: 0; padding: 8px 22px 8px 8px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 13px; color: var(--text); background: var(--bg);
+  outline: none; cursor: pointer; appearance: none;
+  -webkit-appearance: none; transition: border-color 0.2s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#dir-select:focus { border-color: var(--accent); }
+#dir-select-wrap { position: relative; flex-shrink: 0; }
+#dir-select-wrap::after {
+  content: '▾'; position: absolute; right: 8px; top: 50%;
+  transform: translateY(-50%); pointer-events: none;
+  color: var(--text-muted); font-size: 12px;
+}
 
 /* 年份筛选区 */
 #year-tabs {
@@ -310,6 +325,9 @@ body {
       </div>
       <div id="repo-selector-wrap">
         <select id="repo-select" onchange="switchRepo(this.value)"></select>
+        <div id="dir-select-wrap">
+          <select id="dir-select" onchange="switchDir(this.value)"></select>
+        </div>
         <button id="refresh-btn" onclick="refreshRepo()" title="刷新目录" style="flex-shrink:0;background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px 4px;display:flex;align-items:center;transition:color 0.15s;">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -365,6 +383,7 @@ let currentFileSha = '';
 let currentRawText = '';
 let currentQuick = '';
 let currentPaid = '';
+let currentRootDir = '记忆承载';
 let searchKeyword = '';
 let allArticles = [];
 
@@ -485,10 +504,39 @@ function switchRepo(repo) {
   allArticles = [];
   currentYear = new Date().getFullYear().toString();
   currentQuick = '';
+  currentPaid = '';
   readSet = new Set();
   clearReader();
-  loadRepoArticles(repo);
+  buildDirSelector(repo).then(() => loadRepoArticles(repo));
   loadGist();
+}
+
+async function buildDirSelector(repo) {
+  const sel = document.getElementById('dir-select');
+  sel.innerHTML = '<option value="">全部</option>';
+  try {
+    const items = await fetchDir(repo, '');
+    const dirs = items.filter(i => i.type === 'dir').map(i => i.name);
+    dirs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = d;
+      sel.appendChild(opt);
+    });
+    if (dirs.includes(currentRootDir)) {
+      sel.value = currentRootDir;
+    } else {
+      currentRootDir = '';
+      sel.value = '';
+    }
+  } catch {}
+}
+
+function switchDir(dir) {
+  currentRootDir = dir;
+  currentYear = new Date().getFullYear().toString();
+  currentQuick = '';
+  currentPaid = '';
+  loadRepoArticles(currentRepo);
 }
 
 // ========== 动态加载文章列表 ==========
@@ -505,7 +553,7 @@ async function loadRepoArticles(repo) {
 
   try {
     const articles = [];
-    await scanDir(repo, '', articles, 0);
+    await scanDir(repo, currentRootDir, articles, 0);
 
     if (articles.length === 0) {
       setListStatus('<p>此仓库中未找到 .md 文件</p>');
