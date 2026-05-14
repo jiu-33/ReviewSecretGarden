@@ -180,6 +180,9 @@ body {
   cursor: pointer; transition: all 0.15s; white-space: nowrap;
 }
 .quick-btn.active { background: var(--accent-light); color: var(--accent); border-color: #d9c5a8; font-weight: 600; }
+.paid-btn { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; color: var(--text-secondary); background: transparent; border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.paid-btn.active { background: #fff8e6; color: #c8860a; border-color: #f0d080; font-weight: 600; }
+#paid-filter-bar { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 
 /* 文章列表 */
 #article-list { flex: 1; overflow-y: auto; padding: 4px 0; }
@@ -322,6 +325,7 @@ body {
         </svg>
       </button>
     </div>
+    <div id="paid-filter-bar"></div>
     <div id="search-wrap">
       <input type="text" id="search-input" placeholder="搜索文章标题…" autocomplete="off" spellcheck="false">
     </div>
@@ -360,6 +364,7 @@ let currentYear = new Date().getFullYear().toString();
 let currentFileSha = '';
 let currentRawText = '';
 let currentQuick = '';
+let currentPaid = '';
 let searchKeyword = '';
 let allArticles = [];
 
@@ -578,6 +583,7 @@ function renderArticleList() {
   tabsEl.appendChild(sel);
 
   renderQuickBtns();
+  renderPaidBtns();
   renderFilteredList();
   renderRecentSection();
 }
@@ -595,6 +601,28 @@ function renderQuickBtns() {
       tabsEl.appendChild(btn);
     });
   }
+}
+
+function renderPaidBtns() {
+  const bar = document.getElementById('paid-filter-bar');
+  bar.innerHTML = '';
+  const hasPaid = allArticles.some(a => a.isPaid);
+  if (!hasPaid) return;
+  [['全部', ''], ['付费', 'paid']].forEach(([label, val]) => {
+    const btn = document.createElement('button');
+    btn.className = 'paid-btn' + (currentPaid === val ? ' active' : '');
+    btn.textContent = label;
+    btn.onclick = () => filterPaid(val);
+    bar.appendChild(btn);
+  });
+}
+
+function filterPaid(val) {
+  currentPaid = val;
+  document.querySelectorAll('.paid-btn').forEach(b => {
+    b.classList.toggle('active', (b.textContent === '全部' && val === '') || (b.textContent === '付费' && val === 'paid'));
+  });
+  renderFilteredList();
 }
 
 function filterYear(year) {
@@ -629,6 +657,9 @@ function renderFilteredList() {
     const cutoff = new Date(now - days * 86400000);
     filtered = filtered.filter(a => a.date && new Date(a.date) >= cutoff);
   }
+  if (currentPaid === 'paid') {
+    filtered = filtered.filter(a => a.isPaid);
+  }
   if (searchKeyword) {
     const kw = searchKeyword.toLowerCase();
     filtered = filtered.filter(a => a.title.toLowerCase().includes(kw));
@@ -658,6 +689,7 @@ function renderFilteredList() {
 
 function setListStatus(html) {
   document.getElementById('year-tabs').innerHTML = '';
+  document.getElementById('paid-filter-bar').innerHTML = '';
   document.getElementById('article-list').innerHTML = `<div class="list-status">${html}</div>`;
 }
 
